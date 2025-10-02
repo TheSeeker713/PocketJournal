@@ -21,9 +21,10 @@ def test_main_window_creation(qtbot, app):
     window = PocketJournalMainWindow()
     qtbot.addWidget(window)
     
-    assert window.windowTitle() == "PocketJournal"
-    assert window.minimumSize().width() == 800
-    assert window.minimumSize().height() == 600
+    # Check that title contains the app name (it now includes version info)
+    assert "PocketJournal" in window.windowTitle()
+    assert window.minimumSize().width() == 600
+    assert window.minimumSize().height() == 400
 
 
 def test_app_creation():

@@ -4,10 +4,11 @@ PocketJournal - A Windows-first personal journaling application.
 Built with PySide6 for a native Windows experience.
 """
 
-__version__ = "0.1.0"
-__author__ = "PocketJournal Team"
-__email__ = "contact@pocketjournal.app"
-
+from .app_meta import VERSION, APP_NAME, ORG_NAME
 from .main import main
 
-__all__ = ["main"]
+__version__ = VERSION
+__author__ = ORG_NAME
+__email__ = "contact@myceliainteractive.com"
+
+__all__ = ["main", "__version__"]
