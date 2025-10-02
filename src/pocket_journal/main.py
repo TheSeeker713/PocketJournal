@@ -13,6 +13,7 @@ from PySide6.QtGui import QIcon
 
 from .app_meta import APP_NAME, ORG_NAME, VERSION, get_app_title, get_version_string
 from .settings import settings, get_setting
+from .ui.launcher_manager import LauncherManager
 
 
 class PocketJournalMainWindow(QMainWindow):
@@ -20,7 +21,31 @@ class PocketJournalMainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.launcher_manager = None
         self.init_ui()
+        self.setup_launcher()
+    
+    def setup_launcher(self):
+        """Setup the micro-launcher system."""
+        self.launcher_manager = LauncherManager(self)
+        
+        # Connect launcher signals
+        self.launcher_manager.panel_expanded.connect(self.on_panel_expanded)
+        self.launcher_manager.panel_collapsed.connect(self.on_panel_collapsed)
+    
+    def on_panel_expanded(self):
+        """Handle when the editor panel is expanded."""
+        # Optionally minimize or hide the main window when panel is active
+        if get_setting("minimize_main_when_panel_open", False):
+            self.showMinimized()
+    
+    def on_panel_collapsed(self):
+        """Handle when the editor panel is collapsed."""
+        # Restore main window if it was minimized
+        if self.isMinimized():
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -83,7 +108,7 @@ class PocketJournalMainWindow(QMainWindow):
         """)
         
         # Settings info for development
-        settings_info = QLabel(f"Settings: {settings.settings_file}\nData: {settings.data_dir}")
+        settings_info = QLabel(f"Settings: {settings.settings_file}\nData: {settings.data_dir}\n\nMicro-launcher active! Look for the blue circle in the corner.\nClick it to expand the quick editor.")
         settings_info.setAlignment(Qt.AlignCenter)
         settings_info.setStyleSheet("""
             QLabel {
@@ -91,10 +116,11 @@ class PocketJournalMainWindow(QMainWindow):
                 color: #bdc3c7;
                 font-family: 'Consolas', 'Courier New', monospace;
                 margin-top: 20px;
-                padding: 10px;
+                padding: 15px;
                 background-color: #f8f9fa;
                 border: 1px solid #e9ecef;
                 border-radius: 4px;
+                line-height: 1.4;
             }
         """)
         
@@ -116,6 +142,10 @@ class PocketJournalMainWindow(QMainWindow):
         settings.set("window_geometry.height", geometry.height())
         settings.set("window_geometry.x", geometry.x())
         settings.set("window_geometry.y", geometry.y())
+        
+        # Shutdown launcher manager
+        if self.launcher_manager:
+            self.launcher_manager.shutdown()
         
         # Accept the close event
         event.accept()

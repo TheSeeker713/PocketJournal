@@ -56,7 +56,34 @@ DEFAULT_SETTINGS = {
     "date_format": "%Y-%m-%d",
     "time_format": "%H:%M",
     "auto_date_headers": True,
-    "encrypt_entries": False
+    "encrypt_entries": False,
+    
+    # Launcher settings
+    "launcher": {
+        "circle_size": 48,
+        "last_corner": "top-right",
+        "snap_threshold": 100,
+        "animation_duration": 300
+    },
+    
+    # Editor panel settings
+    "editor_panel": {
+        "width": 480,
+        "height": 640,
+        "auto_focus": True,
+        "remember_content": True
+    },
+    
+    # Quick notes settings
+    "quick_notes": {
+        "content": "",
+        "last_modified": None,
+        "word_count": 0
+    },
+    
+    # Launcher behavior
+    "minimize_main_when_panel_open": False,
+    "launcher_always_visible": True
 }
 
 
