@@ -6,6 +6,7 @@ from .editor_panel_integrated import IntegratedEditorPanel
 from .launcher_manager import LauncherManager
 from .system_tray import SystemTrayManager, DockModeManager, StartupManager
 from .settings_dialog import SettingsDialog, show_settings_dialog
+from .entry_actions import EntryActionsManager, EntryActionsMenu, open_data_folder
 
 __all__ = [
     'CircularLauncher',
@@ -16,5 +17,8 @@ __all__ = [
     'DockModeManager',
     'StartupManager',
     'SettingsDialog',
-    'show_settings_dialog'
+    'show_settings_dialog',
+    'EntryActionsManager',
+    'EntryActionsMenu',
+    'open_data_folder'
 ]

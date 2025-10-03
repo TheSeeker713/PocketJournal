@@ -23,6 +23,7 @@ from PySide6.QtGui import QFont, QIcon
 from ..settings import settings, get_setting, set_setting
 from ..app_meta import APP_NAME, get_app_title, get_version_string
 from .system_tray import StartupManager
+from .entry_actions import open_data_folder
 
 logger = logging.getLogger(__name__)
 
@@ -395,18 +396,7 @@ class SettingsDialog(QDialog):
     
     def open_data_directory(self):
         """Open the data directory in file explorer."""
-        import os
-        data_dir = settings.data_dir
-        
-        try:
-            if sys.platform.startswith('win'):
-                os.startfile(data_dir)
-            elif sys.platform.startswith('darwin'):
-                os.system(f'open "{data_dir}"')
-            else:
-                os.system(f'xdg-open "{data_dir}"')
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not open data directory: {e}")
+        open_data_folder()
     
     def apply_settings(self):
         """Apply current settings without closing dialog."""

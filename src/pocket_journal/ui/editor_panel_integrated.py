@@ -14,7 +14,7 @@ from typing import Optional
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QLabel, QToolButton,
-    QFrame, QSizePolicy, QApplication, QSpacerItem
+    QFrame, QSizePolicy, QApplication, QSpacerItem, QMessageBox
 )
 from PySide6.QtCore import (
     Qt, QPropertyAnimation, QRect, QSize, QEasingCurve, QTimer, QPoint,
@@ -27,6 +27,10 @@ from PySide6.QtGui import (
 
 from ..settings import settings, get_setting, set_setting
 from ..app_meta import APP_NAME
+from ..core.autosave import AutosaveManager, EntryLifecycleManager
+from ..core.smart_formatting import SmartFormatter, TitleSubtitleExtractor
+from .formatting_toolbar import SmartFormattingToolbar
+from .entry_actions import EntryActionsManager, open_data_folder
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +307,13 @@ class CompactStatusBar(QWidget):
                 }
             """)
             self.autosave_label.setToolTip("Autosave active")
+    
+    def set_last_save_time(self, save_time: str):
+        """Update autosave tooltip with last save time."""
+        if save_time:
+            self.autosave_label.setToolTip(f"Last saved at {save_time}")
+        else:
+            self.autosave_label.setToolTip("Autosave active")
 
 
 class IntegratedEditorPanel(QWidget):
@@ -330,6 +341,11 @@ class IntegratedEditorPanel(QWidget):
     settings_requested = Signal()
     help_requested = Signal()
     
+    # Entry lifecycle signals
+    entry_created = Signal(dict)     # entry info
+    entry_updated = Signal(dict)     # entry info
+    entry_saved = Signal(str)        # save time
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -345,14 +361,19 @@ class IntegratedEditorPanel(QWidget):
         self.collapse_animation = None
         self.is_expanded = False
         
-        # Auto-save
-        self.autosave_timer = QTimer()
-        self.autosave_timer.setSingleShot(True)
-        self.autosave_timer.timeout.connect(self._autosave)
-        self.is_saving = False
+        # Initialize systems (will be set up after UI)
+        self.autosave_manager = None
+        self.lifecycle_manager = None
+        self.smart_formatter = None
+        self.title_subtitle_extractor = None
+        self.entry_actions_manager = None
+        self.current_toast = None  # For undo toasts
         
         # Setup UI and functionality
         self.setup_ui()
+        self.setup_smart_formatting()
+        self.setup_autosave_system()
+        self.setup_entry_actions()
         self.setup_shortcuts()
         self.setup_connections()
         
@@ -376,6 +397,12 @@ class IntegratedEditorPanel(QWidget):
         # Top bar
         self.top_bar = CompactTopBar()
         layout.addWidget(self.top_bar)
+        
+        # Formatting toolbar (will be initialized after text editor)
+        self.formatting_toolbar = None
+        self.formatting_toolbar_placeholder = QWidget()
+        self.formatting_toolbar_placeholder.setFixedHeight(0)
+        layout.addWidget(self.formatting_toolbar_placeholder)
         
         # Main text editor
         self.text_editor = QTextEdit()
@@ -435,6 +462,76 @@ class IntegratedEditorPanel(QWidget):
         # Connect content changes
         self.text_editor.textChanged.connect(self._on_text_changed)
     
+    def setup_entry_actions(self):
+        """Setup entry actions manager and toast display."""
+        self.entry_actions_manager = EntryActionsManager()
+        
+        # Connect entry actions signals
+        self.entry_actions_manager.entry_renamed.connect(self._on_entry_renamed)
+        self.entry_actions_manager.entry_duplicated.connect(self._on_entry_duplicated)
+        self.entry_actions_manager.entry_exported.connect(self._on_entry_exported)
+        self.entry_actions_manager.entry_deleted.connect(self._on_entry_deleted)
+        self.entry_actions_manager.entry_restored.connect(self._on_entry_restored)
+        self.entry_actions_manager.show_toast.connect(self._show_toast)
+        self.entry_actions_manager.hide_toast.connect(self._hide_toast)
+    
+    def _show_toast(self, toast_widget):
+        """Show an undo toast at the bottom of the panel."""
+        # Hide any existing toast
+        self._hide_toast()
+        
+        self.current_toast = toast_widget
+        toast_widget.setParent(self)
+        
+        # Position toast at the bottom of the panel
+        panel_rect = self.geometry()
+        toast_width = min(400, panel_rect.width() - 20)
+        toast_height = 40
+        
+        toast_x = (panel_rect.width() - toast_width) // 2
+        toast_y = panel_rect.height() - toast_height - 10
+        
+        toast_widget.setGeometry(toast_x, toast_y, toast_width, toast_height)
+        toast_widget.show()
+        toast_widget.raise_()
+    
+    def _hide_toast(self):
+        """Hide the current toast."""
+        if self.current_toast:
+            self.current_toast.hide()
+            self.current_toast.setParent(None)
+            self.current_toast = None
+    
+    def _on_entry_renamed(self, old_path: str, new_path: str):
+        """Handle entry renamed."""
+        logger.info(f"Entry renamed: {old_path} -> {new_path}")
+        # Update current entry path if it matches
+        if (self.autosave_manager and self.autosave_manager.current_entry and 
+            self.autosave_manager.current_entry.metadata.path == old_path):
+            self.autosave_manager.current_entry.metadata.path = new_path
+    
+    def _on_entry_duplicated(self, new_path: str):
+        """Handle entry duplicated."""
+        logger.info(f"Entry duplicated: {new_path}")
+        QMessageBox.information(self, "Entry Duplicated", f"Entry duplicated successfully!")
+    
+    def _on_entry_exported(self, source_path: str, destination: str):
+        """Handle entry exported."""
+        logger.info(f"Entry exported: {source_path} -> {destination}")
+    
+    def _on_entry_deleted(self, deleted_path: str):
+        """Handle entry deleted."""
+        logger.info(f"Entry deleted: {deleted_path}")
+        # If current entry was deleted, create a new one
+        if (self.autosave_manager and self.autosave_manager.current_entry and 
+            self.autosave_manager.current_entry.metadata.path == deleted_path):
+            self._create_new_entry()
+    
+    def _on_entry_restored(self, restored_path: str):
+        """Handle entry restored."""
+        logger.info(f"Entry restored: {restored_path}")
+        QMessageBox.information(self, "Entry Restored", "Entry restored successfully!")
+    
     def setup_shortcuts(self):
         """Setup keyboard shortcuts."""
         # Ctrl+N for new entry
@@ -468,38 +565,107 @@ class IntegratedEditorPanel(QWidget):
         self.top_bar.settings_clicked.connect(self.settings_requested.emit)
         self.top_bar.help_clicked.connect(self.help_requested.emit)
     
+    def setup_smart_formatting(self):
+        """Setup smart formatting system."""
+        # Initialize smart formatter
+        self.smart_formatter = SmartFormatter(self.text_editor, self)
+        
+        # Initialize title/subtitle extractor
+        self.title_subtitle_extractor = TitleSubtitleExtractor(self.smart_formatter, self)
+        
+        # Create and setup formatting toolbar
+        self.formatting_toolbar = SmartFormattingToolbar(self.smart_formatter, self)
+        
+        # Replace placeholder with actual toolbar
+        layout = self.layout()
+        toolbar_index = layout.indexOf(self.formatting_toolbar_placeholder)
+        layout.removeWidget(self.formatting_toolbar_placeholder)
+        self.formatting_toolbar_placeholder.deleteLater()
+        layout.insertWidget(toolbar_index, self.formatting_toolbar)
+        
+        # Connect title/subtitle changes to metadata updates
+        self.title_subtitle_extractor.title_subtitle_changed.connect(self._on_title_subtitle_changed)
+        
+        # Connect formatting toolbar signals
+        self.formatting_toolbar.rule_toggled.connect(self._on_formatting_rule_toggled)
+        
+        logger.debug("Smart formatting system initialized")
+    
+    def setup_autosave_system(self):
+        """Setup autosave and entry lifecycle management."""
+        # Initialize autosave manager
+        self.autosave_manager = AutosaveManager(self.text_editor, self)
+        
+        # Initialize lifecycle manager
+        self.lifecycle_manager = EntryLifecycleManager(self.autosave_manager, self)
+        
+        # Connect autosave signals to UI
+        self.autosave_manager.save_started.connect(self._on_save_started)
+        self.autosave_manager.save_completed.connect(self._on_save_completed)
+        
+        # Connect lifecycle signals to panel signals
+        self.lifecycle_manager.entry_created.connect(self.entry_created.emit)
+        self.lifecycle_manager.entry_updated.connect(self.entry_updated.emit)
+        self.lifecycle_manager.entry_saved.connect(self.entry_saved.emit)
+        self.lifecycle_manager.entry_saved.connect(self._update_save_time_display)
+        
+        # Connect panel signals to autosave actions
+        self.new_entry_requested.connect(self._create_new_entry)
+        self.save_requested.connect(self._manual_save)
+        
+        logger.debug("Autosave system initialized")
+    
     def _on_text_changed(self):
-        """Handle text changes."""
+        """Handle text changes - now managed by autosave system."""
         content = self.text_editor.toPlainText()
         self.content_changed.emit(content)
-        
-        # Start autosave timer
-        self.autosave_timer.stop()
-        delay = get_setting("autosave_debounce_ms", 900)
-        self.autosave_timer.start(delay)
+        # Note: Autosave manager handles the actual saving logic
     
-    def _autosave(self):
-        """Perform autosave."""
-        if not self.is_saving:
-            self.is_saving = True
-            self.status_bar.set_autosave_status(True)
-            
-            # Simulate save operation
-            QTimer.singleShot(150, self._autosave_complete)
-            
-            logger.debug("Autosave triggered")
+    def _on_save_started(self):
+        """Handle autosave start."""
+        self.status_bar.set_autosave_status(True)
+        logger.debug("Autosave started")
     
-    def _autosave_complete(self):
-        """Complete autosave."""
-        self.is_saving = False
+    def _on_save_completed(self, success: bool):
+        """Handle autosave completion."""
         self.status_bar.set_autosave_status(False)
-        logger.debug("Autosave completed")
+        if success:
+            logger.debug("Autosave completed successfully")
+        else:
+            logger.warning("Autosave failed")
+    
+    def _update_save_time_display(self, save_time: str):
+        """Update status bar with last save time."""
+        self.status_bar.set_last_save_time(save_time)
+    
+    def _on_title_subtitle_changed(self, title: str, subtitle: str):
+        """Handle title/subtitle changes from smart formatting."""
+        # Update current entry metadata if available
+        if self.autosave_manager and self.autosave_manager.current_entry:
+            entry = self.autosave_manager.current_entry
+            entry.metadata.title = title
+            entry.metadata.subtitle = subtitle
+            logger.debug(f"Title/subtitle updated: '{title}' / '{subtitle}'")
+    
+    def _on_formatting_rule_toggled(self, rule_name: str, enabled: bool):
+        """Handle formatting rule toggle."""
+        logger.info(f"Formatting rule '{rule_name}' {'enabled' if enabled else 'disabled'}")
+    
+    def _create_new_entry(self):
+        """Create new entry via autosave manager."""
+        if self.autosave_manager:
+            self.autosave_manager.create_new_entry()
+            logger.info("New entry created")
     
     def _manual_save(self):
-        """Handle manual save."""
+        """Handle manual save via autosave manager."""
         self.save_requested.emit()
-        self._autosave()
-        logger.info("Manual save requested")
+        if self.autosave_manager:
+            success = self.autosave_manager.force_save()
+            if success:
+                logger.info("Manual save completed")
+            else:
+                logger.warning("Manual save failed")
     
     def _on_back_clicked(self):
         """Handle back button."""
@@ -514,8 +680,34 @@ class IntegratedEditorPanel(QWidget):
         logger.info("Tags clicked")
     
     def _on_more_clicked(self):
-        """Handle more actions button."""
+        """Handle more actions button - show entry actions menu."""
         logger.info("More actions clicked")
+        
+        # Check if we have a current entry
+        if not (self.autosave_manager and self.autosave_manager.current_entry):
+            QMessageBox.information(self, "No Entry", 
+                                  "No entry is currently loaded. Please create or open an entry first.")
+            return
+        
+        current_entry = self.autosave_manager.current_entry
+        
+        # Ensure entry has been saved (has a path)
+        if not current_entry.metadata.path:
+            # Force save first
+            success = self.autosave_manager.force_save()
+            if not success:
+                QMessageBox.warning(self, "Save Required", 
+                                  "Please save the entry before accessing more actions.")
+                return
+        
+        # Create and show the entry actions menu
+        menu = self.entry_actions_manager.create_actions_menu(current_entry, self)
+        
+        # Position menu relative to the more button
+        button_rect = self.top_bar.more_btn.geometry()
+        button_global_pos = self.top_bar.more_btn.mapToGlobal(button_rect.bottomLeft())
+        
+        menu.exec(button_global_pos)
     
     def expand_from_position(self, start_pos, start_size):
         """Expand the panel from a given position."""
@@ -609,7 +801,8 @@ class IntegratedEditorPanel(QWidget):
     
     def save_content(self):
         """Save current content (trigger autosave)."""
-        self._autosave()
+        if self.autosave_manager:
+            self.autosave_manager.force_save()
     
     def save_settings(self):
         """Save panel settings."""
@@ -654,3 +847,71 @@ class IntegratedEditorPanel(QWidget):
         if not self.text_editor.hasFocus():
             self._focus_editor()
         super().mousePressEvent(event)
+    
+    # Entry management methods
+    def get_current_entry_info(self) -> dict:
+        """Get current entry information."""
+        if self.autosave_manager:
+            return self.autosave_manager.get_current_entry_info()
+        return {}
+    
+    def load_entry(self, file_path: str) -> bool:
+        """Load entry from file."""
+        if self.autosave_manager:
+            return self.autosave_manager.load_entry(file_path)
+        return False
+    
+    def save_and_close(self) -> bool:
+        """Save current entry before closing."""
+        if self.autosave_manager:
+            return self.autosave_manager.save_and_close()
+        return True
+    
+    def get_last_save_time(self) -> str:
+        """Get last save time for status display."""
+        if self.autosave_manager:
+            return self.autosave_manager.get_last_save_time_local()
+        return ""
+    
+    def update_autosave_settings(self):
+        """Update autosave settings."""
+        if self.autosave_manager:
+            self.autosave_manager.update_settings()
+    
+    # Smart formatting methods
+    def get_current_title_subtitle(self) -> tuple:
+        """Get current parsed title and subtitle."""
+        if self.title_subtitle_extractor:
+            return self.title_subtitle_extractor.get_current_title_subtitle()
+        return "", ""
+    
+    def toggle_formatting_rule(self, rule_name: str) -> bool:
+        """Toggle a specific formatting rule."""
+        if self.smart_formatter:
+            return self.smart_formatter.toggle_rule(rule_name)
+        return False
+    
+    def get_formatting_rules_info(self) -> dict:
+        """Get information about all formatting rules."""
+        if self.smart_formatter:
+            return self.smart_formatter.get_rules_info()
+        return {}
+    
+    def enable_all_formatting(self):
+        """Enable all formatting rules."""
+        if self.smart_formatter:
+            self.smart_formatter.enable_all_rules()
+            if self.formatting_toolbar:
+                self.formatting_toolbar.update_button_states()
+    
+    def disable_all_formatting(self):
+        """Disable all formatting rules."""
+        if self.smart_formatter:
+            self.smart_formatter.disable_all_rules()
+            if self.formatting_toolbar:
+                self.formatting_toolbar.update_button_states()
+    
+    def apply_formatting(self):
+        """Manually trigger formatting application."""
+        if self.smart_formatter:
+            self.smart_formatter.apply_formatting()
