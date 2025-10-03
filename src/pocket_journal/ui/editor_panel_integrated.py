@@ -558,12 +558,15 @@ class IntegratedEditorPanel(QWidget):
         """Setup signal connections."""
         # Top bar connections
         self.top_bar.back_clicked.connect(self._on_back_clicked)
-        self.top_bar.search_clicked.connect(self.search_requested.emit)
+        self.top_bar.search_clicked.connect(self._on_search_clicked)
         self.top_bar.export_clicked.connect(self._on_export_clicked)
         self.top_bar.tags_clicked.connect(self._on_tags_clicked)
         self.top_bar.more_clicked.connect(self._on_more_clicked)
         self.top_bar.settings_clicked.connect(self.settings_requested.emit)
         self.top_bar.help_clicked.connect(self.help_requested.emit)
+        
+        # Connect search requested signal to our search handler
+        self.search_requested.connect(self._on_search_clicked)
     
     def setup_smart_formatting(self):
         """Setup smart formatting system."""
@@ -668,8 +671,78 @@ class IntegratedEditorPanel(QWidget):
                 logger.warning("Manual save failed")
     
     def _on_back_clicked(self):
-        """Handle back button."""
+        """Handle back button - show recent entries."""
         logger.info("Back/Recent clicked")
+        
+        # Show recent entries popover near the back button
+        if not hasattr(self, '_recent_popover'):
+            from .recent_and_search import RecentEntriesPopover
+            self._recent_popover = RecentEntriesPopover(self)
+            self._recent_popover.entry_selected.connect(self._on_search_entry_selected)
+        
+        # Position popover near back button
+        back_btn_pos = self.top_bar.back_btn.mapToGlobal(QPoint(0, 0))
+        back_btn_size = self.top_bar.back_btn.size()
+        
+        # Show below the button
+        popover_pos = QPoint(
+            back_btn_pos.x(),
+            back_btn_pos.y() + back_btn_size.height() + 5
+        )
+        
+        self._recent_popover.move(popover_pos)
+        self._recent_popover.load_recent_entries()
+        self._recent_popover.show()
+        self._recent_popover.raise_()
+    
+    def _on_search_clicked(self):
+        """Handle search button or Ctrl+K shortcut."""
+        logger.info("Search clicked")
+        
+        # Show search dialog
+        if not hasattr(self, '_search_dialog'):
+            from .recent_and_search import SearchDialog
+            self._search_dialog = SearchDialog(self)
+            self._search_dialog.entry_selected.connect(self._on_search_entry_selected)
+        
+        self._search_dialog.show()
+        self._search_dialog.raise_()
+        self._search_dialog.activateWindow()
+        
+    def _on_search_entry_selected(self, file_path: str):
+        """Handle search entry selection."""
+        logger.info(f"Loading entry from search: {file_path}")
+        
+        # Load the selected entry
+        if self.autosave_manager:
+            try:
+                # Load the entry
+                entry_manager = self.autosave_manager.entry_manager
+                entry = entry_manager.load_entry(file_path)
+                
+                if entry:
+                    # Set as current entry
+                    self.autosave_manager.current_entry = entry
+                    
+                    # Update editor content
+                    self.text_editor.setPlainText(entry.content)
+                    
+                    # Move cursor to end
+                    cursor = self.text_editor.textCursor()
+                    cursor.movePosition(cursor.MoveOperation.End)
+                    self.text_editor.setTextCursor(cursor)
+                    
+                    # Focus editor
+                    self.text_editor.setFocus()
+                    
+                    logger.info(f"Loaded entry: {entry.metadata.title}")
+                else:
+                    QMessageBox.warning(self, "Load Error", 
+                                      "Could not load the selected entry.")
+            except Exception as e:
+                logger.error(f"Error loading entry: {e}")
+                QMessageBox.critical(self, "Error", 
+                                   f"Error loading entry: {str(e)}")
     
     def _on_export_clicked(self):
         """Handle export button."""

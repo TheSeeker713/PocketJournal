@@ -255,9 +255,60 @@ class CircularLauncher(QWidget):
         """Handle mouse enter for hover effect."""
         # Slight scale animation on hover
         self.setStyleSheet("QWidget { border: 2px solid rgba(255, 255, 255, 100); border-radius: 24px; }")
+        
+        # Show recent entries popover after a short delay
+        if not hasattr(self, 'hover_timer'):
+            self.hover_timer = QTimer()
+            self.hover_timer.setSingleShot(True)
+            self.hover_timer.timeout.connect(self._show_recent_popover)
+        
+        self.hover_timer.start(800)  # 800ms delay before showing popover
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """Handle mouse leave."""
         self.setStyleSheet("")
+        
+        # Cancel hover timer
+        if hasattr(self, 'hover_timer'):
+            self.hover_timer.stop()
+            
+        # Hide popover after a short delay (gives time to move mouse to popover)
+        if hasattr(self, 'recent_popover') and self.recent_popover.isVisible():
+            if not hasattr(self, 'hide_timer'):
+                self.hide_timer = QTimer()
+                self.hide_timer.setSingleShot(True)
+                self.hide_timer.timeout.connect(self._hide_recent_popover)
+            self.hide_timer.start(200)  # 200ms delay before hiding
+            
         super().leaveEvent(event)
+        
+    def _show_recent_popover(self):
+        """Show the recent entries popover."""
+        if not hasattr(self, 'recent_popover'):
+            from .recent_and_search import RecentEntriesPopover
+            self.recent_popover = RecentEntriesPopover()
+            self.recent_popover.entry_selected.connect(self._on_recent_entry_selected)
+            
+        # Cancel any pending hide
+        if hasattr(self, 'hide_timer'):
+            self.hide_timer.stop()
+            
+        # Show popover positioned near launcher
+        launcher_pos = self.pos()
+        launcher_size = self.size()
+        self.recent_popover.show_near_launcher(launcher_pos, launcher_size)
+        
+    def _hide_recent_popover(self):
+        """Hide the recent entries popover."""
+        if hasattr(self, 'recent_popover') and self.recent_popover.isVisible():
+            self.recent_popover.hide()
+            
+    def _on_recent_entry_selected(self, file_path: str):
+        """Handle recent entry selection."""
+        # Hide the popover
+        self._hide_recent_popover()
+        
+        # Emit signal to open the entry
+        # For now, just expand the panel - the launcher manager will handle loading the entry
+        self.expand_requested.emit()

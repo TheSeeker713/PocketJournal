@@ -7,6 +7,7 @@ from .launcher_manager import LauncherManager
 from .system_tray import SystemTrayManager, DockModeManager, StartupManager
 from .settings_dialog import SettingsDialog, show_settings_dialog
 from .entry_actions import EntryActionsManager, EntryActionsMenu, open_data_folder
+from .recent_and_search import RecentEntriesPopover, SearchDialog, FastSearchEngine
 
 __all__ = [
     'CircularLauncher',
@@ -20,5 +21,8 @@ __all__ = [
     'show_settings_dialog',
     'EntryActionsManager',
     'EntryActionsMenu',
-    'open_data_folder'
+    'open_data_folder',
+    'RecentEntriesPopover',
+    'SearchDialog',
+    'FastSearchEngine'
 ]
