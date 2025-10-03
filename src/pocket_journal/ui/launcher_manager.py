@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QKeySequence
 
 from .micro_launcher import CircularLauncher
-from .editor_panel import QuickEditorPanel
+from .editor_panel_integrated import IntegratedEditorPanel
 from .system_tray import SystemTrayManager, DockModeManager
 from ..settings import settings, get_setting
 
@@ -70,7 +70,7 @@ class LauncherManager(QObject):
             self.setup_corner_mode()
         
         # Create editor panel (always needed regardless of dock mode)
-        self.editor_panel = QuickEditorPanel()
+        self.editor_panel = IntegratedEditorPanel()
         self.editor_panel.collapse_requested.connect(self.collapse_panel)
         
         logger.debug(f"Launcher components setup for {dock_mode} mode")
