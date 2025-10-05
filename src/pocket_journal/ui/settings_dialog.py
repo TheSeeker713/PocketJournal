@@ -8,22 +8,17 @@ application behavior, dock mode, startup options, and other preferences.
 import sys
 import logging
 import platform
-import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget,
     QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox, QSpinBox,
-    QGroupBox, QButtonGroup, QRadioButton, QTextEdit, QSlider,
-    QFileDialog, QMessageBox, QDialogButtonBox, QWidget, QScrollArea,
-    QFrame, QSpacerItem, QSizePolicy, QTextBrowser, QPlainTextEdit
+    QGroupBox, QButtonGroup, QRadioButton, QFileDialog, QMessageBox, QDialogButtonBox, QWidget, QPlainTextEdit
 )
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QFont, QIcon
 
 from ..settings import settings, get_setting, set_setting
-from ..app_meta import APP_NAME, get_app_title, get_version_string, ORG_NAME
+from ..app_meta import APP_NAME, get_version_string, ORG_NAME
 from .system_tray import StartupManager
 from .entry_actions import open_data_folder
 from ..core.global_hotkey import GlobalHotkeyManager
@@ -1034,15 +1029,8 @@ used by developers and power users.
     
     def show_about(self):
         """Show about dialog."""
-        from ..app_meta import get_version_string, ORG_NAME
-        about_text = f"""
-<h2>{APP_NAME}</h2>
-<p><b>Version:</b> {get_version_string()}</p>
-<p><b>Organization:</b> {ORG_NAME}</p>
-<p>A simple journaling application with a micro-launcher interface.</p>
-<p>Built with PySide6 and Qt.</p>
-        """
-        QMessageBox.about(self, f"About {APP_NAME}", about_text)
+        from .about_dialog import show_about_dialog
+        show_about_dialog(self)
     
     def show_about_qt(self):
         """Show about Qt dialog."""

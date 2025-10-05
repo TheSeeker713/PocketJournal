@@ -7,9 +7,8 @@ It also handles dock mode switching between corner launcher and system tray.
 """
 
 import logging
-from PySide6.QtWidgets import QWidget, QApplication
+from typing import Optional
 from PySide6.QtCore import QObject, QTimer, Signal
-from PySide6.QtGui import QKeySequence
 
 from .micro_launcher import CircularLauncher
 from .editor_panel_integrated import IntegratedEditorPanel
@@ -42,10 +41,10 @@ class LauncherManager(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        # Components
-        self.circular_launcher = None
-        self.editor_panel = None
-        self.system_tray = None
+        # Components with proper type annotations
+        self.circular_launcher: Optional[CircularLauncher] = None
+        self.editor_panel: Optional[IntegratedEditorPanel] = None
+        self.system_tray: Optional[SystemTrayManager] = None
         self.dock_mode_manager = DockModeManager()
         
         # State

@@ -805,7 +805,7 @@ class IntegratedEditorPanel(QWidget):
             target_y = screen_geometry.top() + 20
         
         # Set initial position and size
-        start_rect = QRect(start_pos[0], start_pos[1], start_size[0], start_size[1])
+        start_rect = QRect(start_pos.x(), start_pos.y(), start_size.width(), start_size.height())
         target_rect = QRect(target_x, target_y, self.target_width, self.target_height)
         
         self.setGeometry(start_rect)

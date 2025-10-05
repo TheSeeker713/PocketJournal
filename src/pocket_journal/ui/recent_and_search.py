@@ -71,7 +71,7 @@ class RecentEntryItem(QWidget):
                 time_str = local_time.strftime("%m/%d/%y %I:%M %p")
             else:
                 time_str = "Unknown time"
-        except:
+        except (ValueError, AttributeError, TypeError):
             time_str = "Unknown time"
             
         time_label = QLabel(time_str)
@@ -298,7 +298,7 @@ class SearchResultItem(QWidget):
                 utc_time = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                 local_time = utc_time.astimezone()
                 meta_parts.append(local_time.strftime("%m/%d/%y"))
-        except:
+        except (ValueError, AttributeError, TypeError):
             pass
             
         # Word count

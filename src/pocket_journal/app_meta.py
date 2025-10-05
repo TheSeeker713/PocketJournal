@@ -11,7 +11,7 @@ from typing import Dict, Any
 
 # Core application constants
 APP_NAME = "PocketJournal"
-ORG_NAME = "Mycelia Interactive"
+ORG_NAME = "DigiArtifact"
 
 # Path to version file
 _VERSION_FILE = Path(__file__).parent.parent.parent / "version.json"

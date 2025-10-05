@@ -1,6 +1,15 @@
 # PocketJournal
 
+## ⚠️ DEVELOPMENT WARNING
+**This application is currently in active development and may contain bugs, incomplete features, or unexpected behavior. Use at your own discretion. Data loss or application crashes may occur. Please backup any important journal entries.**
+
+---
+
 A Windows-first personal journaling application built with PySide6.
+
+## What's New
+
+📋 **[View Changelog](about/changelog.md)** - See what's new in the latest version and track development progress.
 
 ## Features
 

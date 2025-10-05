@@ -24,7 +24,7 @@ class TestAppMeta:
     def test_constants(self):
         """Test that core constants are defined correctly."""
         assert APP_NAME == "PocketJournal"
-        assert ORG_NAME == "Mycelia Interactive"
+        assert ORG_NAME == "DigiArtifact"
         assert isinstance(VERSION, str)
         assert isinstance(BUILD_DATE, str)
         assert CHANNEL in ["dev", "beta", "release"]

@@ -382,7 +382,7 @@ def main():
         try:
             shutil.rmtree(temp_dir)
             print(f"🧹 Cleaned up temporary directory: {temp_dir}")
-        except:
+        except (OSError, PermissionError):
             pass
 
 
